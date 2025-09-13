@@ -2,6 +2,7 @@
 
 import os
 import google.generativeai as genai
+from google.cloud import texttospeech
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part, Image
 from .prompts import RECOMMENDER_PROMPT, CREATIVE_DIRECTOR_PROMPT, CRAFT_LIST, OUTREACH_MESSAGE_PROMPT
@@ -116,3 +117,58 @@ def generate_outreach_message(concept_text):
     except Exception as e:
         print(f"Error during outreach message generation: {e}")
         return "Failed to generate outreach message."
+
+def generate_audio(text_to_read, language="English"):
+    """
+    Generates audio from text, cleaning markdown and truncating it if it's too long.
+    """
+    try:
+        # --- NEW: Clean the text of markdown for better audio rendering ---
+        clean_text = text_to_read.replace('**', '').replace('*', '').replace('---', '\n').replace('#', '')
+        # --- END OF NEW SECTION ---
+
+        # Safely truncate the CLEANED text to stay under the 5000-byte limit
+        max_bytes = 4900
+        truncated_bytes = clean_text.encode('utf-8')[:max_bytes]
+        truncated_text = truncated_bytes.decode('utf-8', 'ignore')
+
+        if len(clean_text) > len(truncated_text):
+             last_space = truncated_text.rfind(' ')
+             if last_space != -1:
+                 truncated_text = truncated_text[:last_space] + "..."
+
+        language_code_map = {
+            "English": "en-IN",
+            "Hindi": "hi-IN",
+            "Bengali": "bn-IN",
+            "Tamil": "ta-IN",
+            "Telugu": "te-IN",
+            "Marathi": "mr-IN",
+            "Kannada": "kn-IN"
+        }
+        language_code = language_code_map.get(language, "en-IN")
+
+        client = texttospeech.TextToSpeechClient()
+
+        # Use the clean, truncated text for audio synthesis
+        synthesis_input = texttospeech.SynthesisInput(text=truncated_text)
+
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=language_code,
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
+            name=f"{language_code}-Standard-A"
+        )
+
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3
+        )
+
+        response = client.synthesize_speech(
+            input=synthesis_input, voice=voice, audio_config=audio_config
+        )
+
+        return response.audio_content
+
+    except Exception as e:
+        print(f"Error generating audio: {e}")
+        return None

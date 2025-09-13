@@ -1,4 +1,4 @@
-CRAFT_LIST = "Jaipur Blue Pottery, Kutch Lippan Art, Kalamkari Textile Art, Bidriware Metal Inlay, Pattachitra Scroll Painting"
+CRAFT_LIST = "Jaipur Blue Pottery, Kutch Lippan Art, Kalamkari Textile Art, Bidriware Metal Inlay, Pattachitra Scroll Painting, Channapatna Toys"
 
 RECOMMENDER_PROMPT = f"""
 You are a craft historian and market analyst for 'Setu Sangam', an organization that fosters innovation in Indian handicrafts.
