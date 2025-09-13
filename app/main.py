@@ -6,7 +6,7 @@ from utils.ai_services import (
     generate_full_concept, 
     translate_text, 
     generate_outreach_message,
-    generate_audio # <-- Import our new function
+    generate_audio
 )
 
 # --- Page Configuration ---
@@ -33,7 +33,7 @@ st.divider()
 
 # --- Main App Flow ---
 st.subheader("1. Tell Us About Your Craft")
-artisan_crafts = ["Madhubani Painting", "Jaipur Blue Pottery", "Kutch Lippan Art", "Kalamkari Textile Art", "Bidriware Metal Inlay", "Pattachitra Scroll Painting"]
+artisan_crafts = ["Madhubani Painting", "Jaipur Blue Pottery", "Kutch Lippan Art", "Kalamkari Textile Art", "Bidriware Metal Inlay", "Pattachitra Scroll Painting", "Channapatna Toys"]
 my_craft = st.selectbox("I am a...", artisan_crafts)
 
 # Initialize session state variables
@@ -68,21 +68,42 @@ if st.session_state.recommendation:
 if st.session_state.full_concept_en:
     st.divider()
     st.subheader("✅ Your AI-Generated Proposal")
-    
-    # Determine which text to display and use for audio
-    text_to_show = st.session_state.full_concept_translated or st.session_state.full_concept_en
-    language_for_audio = chosen_language if st.session_state.full_concept_translated else "English"
 
-    st.markdown(text_to_show)
-    
-    # --- NEW: Text-to-Speech "Read Aloud" Feature ---
-    if st.button(f"🔊 Read Aloud in {language_for_audio}", use_container_width=True):
-        with st.spinner("Generating audio... please wait."):
-            audio_bytes = generate_audio(text_to_show, language_for_audio)
-            if audio_bytes:
-                st.audio(audio_bytes, format="audio/mp3")
-            else:
-                st.error("Sorry, I couldn't generate the audio at this time.")
+    if st.session_state.full_concept_translated:
+        # If a translation exists, create tabs for both versions
+        tab1, tab2 = st.tabs([chosen_language, "English (Original)"])
+
+        with tab1:
+            # --- Translated Tab ---
+            st.markdown(st.session_state.full_concept_translated)
+            if st.button(f"🔊 Read Aloud in {chosen_language}", use_container_width=True, key="read_translated"):
+                with st.spinner("Generating audio... please wait."):
+                    audio_bytes = generate_audio(st.session_state.full_concept_translated, chosen_language)
+                    if audio_bytes:
+                        st.audio(audio_bytes, format="audio/mp3")
+                    else:
+                        st.error("Sorry, I couldn't generate the audio at this time.")
+
+        with tab2:
+            # --- English Tab ---
+            st.markdown(st.session_state.full_concept_en)
+            if st.button("🔊 Read Aloud in English", use_container_width=True, key="read_english"):
+                with st.spinner("Generating audio... please wait."):
+                    audio_bytes = generate_audio(st.session_state.full_concept_en, "English")
+                    if audio_bytes:
+                        st.audio(audio_bytes, format="audio/mp3")
+                    else:
+                        st.error("Sorry, I couldn't generate the audio at this time.")
+    else:
+        # If no translation, just show the English version
+        st.markdown(st.session_state.full_concept_en)
+        if st.button("🔊 Read Aloud in English", use_container_width=True):
+            with st.spinner("Generating audio... please wait."):
+                audio_bytes = generate_audio(st.session_state.full_concept_en, "English")
+                if audio_bytes:
+                    st.audio(audio_bytes, format="audio/mp3")
+                else:
+                    st.error("Sorry, I couldn't generate the audio at this time.")
 
     # --- Actionable Outreach Feature ---
     st.divider()
