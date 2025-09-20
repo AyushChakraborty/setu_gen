@@ -1,0 +1,8 @@
+.git
+.gitignore
+
+venv/
+
+app/utils/__pycache__/
+
+.vscode/

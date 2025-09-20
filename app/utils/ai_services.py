@@ -1,133 +1,83 @@
-# app/utils/ai_services.py
-
 import os
-import google.generativeai as genai
 from google.cloud import texttospeech
 import vertexai
-from vertexai.preview.generative_models import GenerativeModel, Part, Image
-from .prompts import RECOMMENDER_PROMPT, CREATIVE_DIRECTOR_PROMPT, CRAFT_LIST, OUTREACH_MESSAGE_PROMPT
-from dotenv import load_dotenv
-load_dotenv()
+from vertexai.preview.generative_models import GenerativeModel
+from .prompts import RECOMMENDER_PROMPT, CREATIVE_DIRECTOR_PROMPT, CRAFT_LIST, OUTREACH_MESSAGE_PROMPT, TREND_ANALYSIS_PROMPT
 
-# --- UNIFIED AUTHENTICATION SETUP ---
-# This is the new section that fixes the error.
-# It initializes the Vertex AI SDK, which automatically handles authentication
-# for both the Vertex AI (Imagen) and Generative Language (Gemini) libraries.
 
 PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 LOCATION = os.getenv("GCP_LOCATION")
 vertexai.init(project=PROJECT_ID, location=LOCATION)
-# --- END OF NEW SECTION ---
 
 
-def get_collaboration_recommendation(my_craft):
-    """
-    Gets an AI-powered recommendation for a partner craft.
-    """
+def get_market_trends(my_craft):
+    """Generates a market trend analysis for a given craft"""
     try:
-        # We need to remove the user's own craft from the list of possibilities
-        filtered_craft_list = CRAFT_LIST.replace(my_craft, "").strip(", ")
-        
-        prompt = RECOMMENDER_PROMPT.replace(CRAFT_LIST, filtered_craft_list) + my_craft
-        
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = GenerativeModel("gemini-2.5-flash")
+        prompt = f"{TREND_ANALYSIS_PROMPT}{my_craft}"
         response = model.generate_content(prompt)
-        
-        # Clean up the response to get just the craft name
-        recommended_craft = response.text.strip()
-        return recommended_craft
+        return response.text.strip()
+    except Exception as e:
+        print(f"Error generating market trends: {e}")
+        return "Could not retrieve market trends at this time."
+
+
+def get_collaboration_recommendation(my_craft, trends_context):
+    """Gets an AI-powered recommendation for a partner craft"""
+    try:
+        model = GenerativeModel("gemini-2.5-flash")
+        filtered_craft_list = CRAFT_LIST.replace(my_craft, "").strip(", ")
+        prompt = RECOMMENDER_PROMPT.replace("[MARKET_TRENDS]", trends_context)
+        prompt = prompt.replace(CRAFT_LIST, filtered_craft_list)
+        prompt += my_craft
+        response = model.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
         print(f"Error in recommendation: {e}")
-        # Fallback in case of an error
         return "Jaipur Blue Pottery"
 
 
-# In app/utils/ai_services.py
-
-# ... (keep all the other code, just replace this one function) ...
-
 def generate_full_concept(craft1, craft2):
-    """
-    Generates the full collaboration concept including text and an AI image.
-    Handles image generation errors gracefully.
-    """
-    generated_text = "Error: Could not generate the text concept."
-    img_bytes = None
-
+    """Generates the full collaboration concept"""
     try:
-        # --- Step 1: Generate the Text Concept using Gemini ---
+        model = GenerativeModel("gemini-2.5-flash")
         text_prompt = f"{CREATIVE_DIRECTOR_PROMPT}\nCraft 1: {craft1}\nCraft 2: {craft2}"
-        text_model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        text_response = text_model.generate_content(text_prompt)
-        generated_text = text_response.text
+        response = model.generate_content(text_prompt)
+        return response.text
     except Exception as e:
         print(f"Error in text generation: {e}")
-        # Return the error in the text part if this fails
-        return f"An error occurred during text generation: {e}", None
-
-    # try:
-    #     # --- Step 2: Generate the Image using Imagen ---
-    #     image_prompt_line = [line for line in generated_text.split('\n') if line.startswith("A photorealistic product shot of")]
-    #     if not image_prompt_line:
-    #         image_prompt = f"A photorealistic product shot of a beautiful fusion between {craft1} and {craft2}."
-    #     else:
-    #         image_prompt = image_prompt_line[0]
-
-    #     image_model = GenerativeModel("imagegeneration@005") 
-    #     image_response = image_model.generate_content([image_prompt])
-    #     img_bytes = image_response.candidates[0].content.to_bytes()
-    # except Exception as e:
-    #     print(f"Error in image generation: {e}")
-    #     # If image generation fails, we'll return the text but no image.
-    #     # This is our graceful fallback.
-    #     img_bytes = None
-            
-    return generated_text #, img_bytes
+        return f"An error occurred during text generation: {e}"
 
 
 def translate_text(text_to_translate, target_language):
-    """
-    Uses Gemini to translate a block of text to a target language.
-    """
+    """Uses Gemini to translate a block of text"""
     try:
-        #better to use gemini again for the translation rather than google translates api say, 
-        #as the translation then would be more literal than creative, which we need
-        #it does end up using more tokens but thats ok in this context
-        prompt = f"Please translate the following English text to {target_language}. Provide only the translated text, without any additional comments or introductions:\n\n---\n\n{text_to_translate}"
-        
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        model = GenerativeModel("gemini-2.5-flash")
+        prompt = f"Please translate the following English text to {target_language}. Provide only the translated text...\n\n---\n\n{text_to_translate}"
         response = model.generate_content(prompt)
-        
         return response.text.strip()
     except Exception as e:
         print(f"Error during translation: {e}")
         return "Translation failed."
 
+
 def generate_outreach_message(concept_text):
-    """
-    Uses Gemini to generate a professional outreach message based on a concept.
-    """
+    """Uses Gemini to generate a professional outreach message"""
     try:
+        model = GenerativeModel("gemini-2.5-flash")
         prompt = f"{OUTREACH_MESSAGE_PROMPT}\n\n---\n\n{concept_text}"
-        
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         response = model.generate_content(prompt)
-        
         return response.text.strip()
     except Exception as e:
         print(f"Error during outreach message generation: {e}")
         return "Failed to generate outreach message."
 
-def generate_audio(text_to_read, language="English"):
-    """
-    Generates audio from text, cleaning markdown and truncating it if it's too long.
-    """
-    try:
-        # --- NEW: Clean the text of markdown for better audio rendering ---
-        clean_text = text_to_read.replace('**', '').replace('*', '').replace('---', '\n').replace('#', '')
-        # --- END OF NEW SECTION ---
 
-        # Safely truncate the CLEANED text to stay under the 5000-byte limit
+def generate_audio(text_to_read, language="English"):
+    """Generates audio from text"""
+    try:
+        client = texttospeech.TextToSpeechClient()
+        clean_text = text_to_read.replace('**', '').replace('*', '').replace('---', '\n').replace('#', '')
         max_bytes = 4900
         truncated_bytes = clean_text.encode('utf-8')[:max_bytes]
         truncated_text = truncated_bytes.decode('utf-8', 'ignore')
@@ -137,38 +87,13 @@ def generate_audio(text_to_read, language="English"):
              if last_space != -1:
                  truncated_text = truncated_text[:last_space] + "..."
 
-        language_code_map = {
-            "English": "en-IN",
-            "Hindi": "hi-IN",
-            "Bengali": "bn-IN",
-            "Tamil": "ta-IN",
-            "Telugu": "te-IN",
-            "Marathi": "mr-IN",
-            "Kannada": "kn-IN"
-        }
+        language_code_map = { "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Tamil": "ta-IN", "Telugu": "te-IN", "Marathi": "mr-IN", "Kannada": "kn-IN" }
         language_code = language_code_map.get(language, "en-IN")
-
-        client = texttospeech.TextToSpeechClient()
-
-        # Use the clean, truncated text for audio synthesis
         synthesis_input = texttospeech.SynthesisInput(text=truncated_text)
-
-        voice = texttospeech.VoiceSelectionParams(
-            language_code=language_code,
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
-            name=f"{language_code}-Standard-A"
-        )
-
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3
-        )
-
-        response = client.synthesize_speech(
-            input=synthesis_input, voice=voice, audio_config=audio_config
-        )
-
+        voice = texttospeech.VoiceSelectionParams(language_code=language_code, ssml_gender=texttospeech.SsmlVoiceGender.FEMALE, name=f"{language_code}-Standard-A")
+        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+        response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
         return response.audio_content
-
     except Exception as e:
         print(f"Error generating audio: {e}")
         return None
