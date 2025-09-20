@@ -3,3 +3,4 @@ google_credentials.json
 venv/
 app/utils/__pycache__/
 .vscode/
+debug_models.py
